@@ -1,0 +1,12 @@
+{
+  "service": {
+    "name": "vector-tool-service",
+    "port": 8087,
+    "environment": "production"
+  },
+  "database": {
+    "url": "jdbc:postgresql://localhost:5432/vectordb",
+    "username": "postgres",
+    "password": "your_secure_password"
+  }
+}
