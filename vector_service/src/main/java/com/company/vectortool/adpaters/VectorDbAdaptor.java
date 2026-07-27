@@ -31,6 +31,17 @@ public class VectorDbAdaptor implements IVectorDbAdaptor {
     }
 
     @Override
+    public String getEmbeddingString(UUID documentId) {
+        try {
+            String sql = "SELECT embedding::text FROM vector_embeddings WHERE document_id = ?";
+            return jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("embedding"), documentId)
+                    .stream().findFirst().orElse(null);
+        } catch (Exception e) {
+            throw new RuntimeException("pgvector retrieval operation error: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void purgeEmbedding(UUID documentId) {
         try {
             jdbcTemplate.update("DELETE FROM vector_embeddings WHERE document_id = ?", documentId);

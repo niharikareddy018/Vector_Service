@@ -6,6 +6,8 @@ import com.company.vectortool.models.Document;
 import com.company.vectortool.models.VectorEmbeddings;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -35,13 +37,16 @@ public class VectorToolController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getDocument(
-            @RequestParam UUID documentId,
-            @RequestParam(required = false) String documentName) {
+    public ResponseEntity<?> getDocument(@RequestParam UUID documentId) {
         try {
-            return sqlDbAdaptor.readDocument(documentId)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
+            return sqlDbAdaptor.readDocument(documentId).map(doc -> {
+                String vectorData = vectorDbAdaptor.getEmbeddingString(documentId);
+                Map<String, Object> combinedResponse = new HashMap<>();
+                combinedResponse.put("documentId", doc.getDocumentId());
+                combinedResponse.put("documentName", doc.getDocumentName());
+                combinedResponse.put("embedding", vectorData != null ? vectorData : "No vector found");
+                return ResponseEntity.ok(combinedResponse);
+            }).orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error executing retrieval flow: " + e.getMessage());
         }
@@ -60,9 +65,7 @@ public class VectorToolController {
     }
 
     @DeleteMapping
-    public ResponseEntity<String> deleteDocument(
-            @RequestParam UUID documentId,
-            @RequestParam(required = false) String documentName) {
+    public ResponseEntity<String> deleteDocument(@RequestParam UUID documentId) {
         try {
             vectorDbAdaptor.purgeEmbedding(documentId);
             sqlDbAdaptor.deleteDocument(documentId);

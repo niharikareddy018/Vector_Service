@@ -6,4 +6,5 @@ import java.util.UUID;
 public interface IVectorDbAdaptor {
     void storeEmbedding(VectorEmbeddings embedding);
     void purgeEmbedding(UUID documentId);
+    String getEmbeddingString(UUID documentId);
 }
