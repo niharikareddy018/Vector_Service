@@ -30,16 +30,19 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <version>42.6.2</version>
         </dependency>
         <dependency>
             <groupId>com.pgvector</groupId>
             <artifactId>pgvector</artifactId>
             <version>0.1.6</version>
         </dependency>
-        <!-- Automated OpenAPI 3 and Swagger UI generation library -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
