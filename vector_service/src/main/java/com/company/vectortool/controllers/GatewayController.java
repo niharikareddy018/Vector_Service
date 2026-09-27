@@ -6,7 +6,8 @@ import com.company.vectortool.services.FileStorageService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -18,7 +19,6 @@ public class GatewayController {
     private final AuthService authService;
     private final FileStorageService fileStorageService;
     private final RabbitTemplate rabbitTemplate;
-    private final RestTemplate restTemplate = new RestTemplate();
 
     public GatewayController(AuthService authService, FileStorageService fileStorageService, RabbitTemplate rabbitTemplate) {
         this.authService = authService;
@@ -29,11 +29,17 @@ public class GatewayController {
     @PostMapping("/upload")
     public ResponseEntity<?> gatewayIngest(
             @RequestHeader("Authorization") String authToken,
-            @RequestParam String filename,
-            @RequestParam String rawTextContent) {
+            @RequestBody Map<String, String> requestBody) {
         
         if (!authService.validateToken(authToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Access Denied: Invalid Authentication Token.");
+        }
+
+        String filename = requestBody.get("filename");
+        String rawTextContent = requestBody.get("rawTextContent");
+
+        if (filename == null || rawTextContent == null) {
+            return ResponseEntity.badRequest().body("Missing filename or rawTextContent parameters.");
         }
 
         UUID documentId = UUID.randomUUID();
@@ -48,7 +54,7 @@ public class GatewayController {
         gatewayResponse.put("userRole", authService.getUserRole(authToken));
         gatewayResponse.put("allocatedId", documentId);
         gatewayResponse.put("fileStorageVaultLocation", storagePathReference);
-        gatewayResponse.put("message", "File written to storage vault and pipeline processing asynchronous task queued successfully.");
+        gatewayResponse.put("message", "File written to storage vault and pipeline processing task queued successfully.");
 
         return ResponseEntity.ok(gatewayResponse);
     }
@@ -63,19 +69,31 @@ public class GatewayController {
         }
 
         try {
-            // Updated port target path routing directly to 8087
-            String pythonAgentUrl = "http://localhost:8087/api/documents/search?userPrompt=" + userPrompt;
-            ResponseEntity<Object[]> agentResponse = restTemplate.getForEntity(pythonAgentUrl, Object[].class);
-            
+            // Fix: Aligned port routing runtime execution to port 8086 parameters
+            ProcessBuilder processBuilder = new ProcessBuilder("python", "ai_agent.py", userPrompt);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            StringBuilder outputJson = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                outputJson.append(line);
+            }
+            process.waitFor();
+
+            org.springframework.boot.json.JsonParser parser = org.springframework.boot.json.JsonParserFactory.getJsonParser();
+            java.util.List<Object> pythonMatches = parser.parseList(outputJson.toString());
+
             Map<String, Object> structuredResult = new HashMap<>();
             structuredResult.put("queryStatus", "PROCESSED");
             structuredResult.put("authorizingRole", authService.getUserRole(authToken));
-            structuredResult.put("retrievedContextMatches", agentResponse.getBody());
+            structuredResult.put("retrievedContextMatches", pythonMatches);
 
             return ResponseEntity.ok(structuredResult);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Query Service routing failure talking to downstream Python Agent: " + e.getMessage());
+                    .body("Query Service runtime command execution failure: " + e.getMessage());
         }
     }
 }
